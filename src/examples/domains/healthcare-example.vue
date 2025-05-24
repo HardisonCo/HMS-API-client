@@ -749,7 +749,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { storeToRefs } from 'pinia';
 import { 
   wizardApiClient, 
   wizardSteps,
@@ -760,15 +761,50 @@ import {
   StakeholderData,
   ExpertiseData 
 } from '../../api/wizard-api-client';
+import { useWizardStore } from '../../stores/wizard';
+import { useNotificationStore } from '../../stores/notifications';
+import { useAuth } from '../../stores/auth';
+import { useForm } from '../../composables/useForm';
+import { useApi } from '../../composables/useApi';
+import { useLocalStorage } from '../../composables';
 
-// State management
-const currentStep = ref(1);
-const deal = ref<DealData | null>(null);
-const processing = ref(false);
-const processingMessage = ref('');
-const processingProgress = ref(0);
+// Store management
+const wizardStore = useWizardStore();
+const notificationStore = useNotificationStore();
+const authStore = useAuthStore();
+
+// Destructure store state
+const {
+  currentDeal: deal,
+  currentStep,
+  isProcessing: processing,
+  processingMessage,
+  progress: processingProgress,
+  isCurrentStepValid,
+  canSubmit: canProceed
+} = storeToRefs(wizardStore);
+
+// Local state
 const fullResponse = ref<any>(null);
 const activeTab = ref('summary');
+
+// Persistent state for draft saving
+const {
+  state: draftData,
+  update: updateDraft,
+  clear: clearDraft
+} = useLocalStorage('healthcare-wizard-draft', {
+  step1: {},
+  step2: {},
+  step3: {},
+  step4: {},
+  step5: {},
+  lastSaved: null
+});
+
+// Auto-save functionality
+const autoSaveEnabled = ref(true);
+let autoSaveInterval: NodeJS.Timeout | null = null;
 
 // Healthcare-specific data
 const suggestedMetrics = ref([

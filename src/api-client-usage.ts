@@ -201,59 +201,265 @@ async function addItem(name: string, description: string, price: number) {
 */
 
 /**
- * Example 6: Integration with React
+ * Example 6: Advanced Vue 3 component with Pinia store integration
  */
 /*
-import React, { useState, useEffect } from 'react';
-import { createApiClient, ItemData } from '../api/api-client';
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue';
+import { useItemsStore } from '@/stores/items';
+import { storeToRefs } from 'pinia';
 
-const api = createApiClient({
-  baseURL: 'http://localhost:8000/api'
+// Use Pinia store for state management
+const itemsStore = useItemsStore();
+const { items, loading, error, pagination } = storeToRefs(itemsStore);
+
+// Local reactive state
+const searchQuery = ref('');
+const selectedCategory = ref('');
+
+// Computed properties
+const filteredItems = computed(() => {
+  return items.value.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.value.toLowerCase());
+    const matchesCategory = !selectedCategory.value || item.category === selectedCategory.value;
+    return matchesSearch && matchesCategory;
+  });
 });
 
-const ItemsList: React.FC = () => {
-  const [items, setItems] = useState<ItemData[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+// Watch for search changes and debounce API calls
+watch(searchQuery, async (newQuery) => {
+  if (newQuery.length > 2) {
+    await itemsStore.searchItems(newQuery);
+  } else if (newQuery.length === 0) {
+    await itemsStore.fetchItems();
+  }
+}, { debounce: 300 });
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await api.items.getItems();
-        if (response.data.success) {
-          setItems(response.data.data.items);
-        } else {
-          setError(response.data.message);
-        }
-      } catch (err: any) {
-        setError(err.message || 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    }
+// Actions
+async function handleCreateItem(itemData: CreateItemData) {
+  await itemsStore.createItem(itemData);
+}
 
-    fetchData();
-  }, []);
+async function handleUpdateItem(id: number, itemData: UpdateItemData) {
+  await itemsStore.updateItem(id, itemData);
+}
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div className="error">{error}</div>;
+async function handleDeleteItem(id: number) {
+  if (confirm('Are you sure you want to delete this item?')) {
+    await itemsStore.deleteItem(id);
+  }
+}
 
-  return (
-    <div>
-      <h1>Items</h1>
-      <ul>
-        {items.map(item => (
-          <li key={item.id}>
-            <h3>{item.name}</h3>
-            <p>{item.description}</p>
-            <div>Price: ${item.price}</div>
-            <div>Status: {item.status}</div>
-          </li>
-        ))}
-      </ul>
+// Load items on component mount
+await itemsStore.fetchItems();
+</script>
+
+<template>
+  <div class="items-page">
+    <header class="page-header">
+      <h1>Items Management</h1>
+      <div class="search-controls">
+        <input 
+          v-model="searchQuery" 
+          type="text" 
+          placeholder="Search items..."
+          class="search-input"
+        />
+        <select v-model="selectedCategory" class="category-select">
+          <option value="">All Categories</option>
+          <option value="electronics">Electronics</option>
+          <option value="clothing">Clothing</option>
+          <option value="books">Books</option>
+        </select>
+      </div>
+    </header>
+
+    <div v-if="loading" class="loading">
+      <div class="spinner"></div>
+      Loading items...
     </div>
-  );
-};
+    
+    <div v-else-if="error" class="error">
+      {{ error }}
+    </div>
+    
+    <div v-else class="items-grid">
+      <div v-for="item in filteredItems" :key="item.id" class="item-card">
+        <img :src="item.image" :alt="item.name" class="item-image" />
+        <div class="item-content">
+          <h3>{{ item.name }}</h3>
+          <p>{{ item.description }}</p>
+          <div class="item-meta">
+            <span class="price">${{ item.price }}</span>
+            <span :class="['status', item.status]">{{ item.status }}</span>
+          </div>
+          <div class="item-actions">
+            <button @click="handleUpdateItem(item.id, { status: 'inactive' })">
+              Deactivate
+            </button>
+            <button @click="handleDeleteItem(item.id)" class="danger">
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
-export default ItemsList;
+    <div v-if="pagination.lastPage > 1" class="pagination">
+      <button 
+        :disabled="pagination.currentPage === 1"
+        @click="itemsStore.fetchItems(pagination.currentPage - 1)"
+      >
+        Previous
+      </button>
+      <span>{{ pagination.currentPage }} / {{ pagination.lastPage }}</span>
+      <button 
+        :disabled="pagination.currentPage === pagination.lastPage"
+        @click="itemsStore.fetchItems(pagination.currentPage + 1)"
+      >
+        Next
+      </button>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.items-page {
+  padding: 2rem;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.search-controls {
+  display: flex;
+  gap: 1rem;
+}
+
+.search-input, .category-select {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.item-card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.2s;
+}
+
+.item-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.item-image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.item-content {
+  padding: 1rem;
+}
+
+.item-meta {
+  display: flex;
+  justify-content: space-between;
+  margin: 1rem 0;
+}
+
+.price {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #2563eb;
+}
+
+.status {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.status.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status.inactive {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.item-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.item-actions button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #3b82f6;
+  color: white;
+}
+
+.item-actions button.danger {
+  background: #ef4444;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 2rem;
+}
+
+.spinner {
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.pagination button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+}
+
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+</style>
 */
