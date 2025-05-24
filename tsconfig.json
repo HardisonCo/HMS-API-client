@@ -17,7 +17,11 @@
     "preserveWatchOutput": true,
     "removeComments": false
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/index.ts",
+    "src/api-client.ts",
+    "src/api/**/*"
+  ],
   "exclude": [
     "node_modules", 
     "**/*.test.ts", 
@@ -25,8 +29,6 @@
     "dist",
     "src/api/hooks.ts",
     "src/api-client-usage.ts",
-    "src/examples/composables.ts",
-    "src/examples/domains/**",
-    "src/examples/wizard-example.vue"
+    "src/api/examples/**"
   ]
 }

@@ -371,7 +371,7 @@ export function useForm(config: FormConfig = {}) {
       }
 
       return result;
-    } catch (error) {
+    } catch (error: any) {
       // Handle validation errors from server
       if (error.response?.data?.errors) {
         setErrors(error.response.data.errors);
