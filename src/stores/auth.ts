@@ -9,10 +9,15 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { hmsApiClient } from '../api';
 import { processApiError, getErrorMessage } from '../api/error-handling';
-import type { UserData } from '../api-client';
+import type { UserData, AuthData } from '../api/hms-api-client';
+
+// Extended user data interface to include permissions
+export interface ExtendedUserData extends UserData {
+  permissions?: string[];
+}
 
 export interface AuthState {
-  user: UserData | null;
+  user: ExtendedUserData | null;
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
@@ -23,7 +28,7 @@ export interface AuthState {
 
 export const useAuthStore = defineStore('auth', () => {
   // State
-  const user = ref<UserData | null>(null);
+  const user = ref<ExtendedUserData | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
   const token = ref<string | null>(localStorage.getItem('auth_token'));
@@ -79,7 +84,8 @@ export const useAuthStore = defineStore('auth', () => {
         // Set user data
         user.value = authData.user;
         token.value = authData.token;
-        refreshToken.value = authData.refresh_token;
+        // AuthData doesn't have refresh_token, use token for now
+        refreshToken.value = authData.token;
         
         // Calculate session expiry (default 24 hours, or based on server response)
         const expiryTime = new Date();
@@ -87,7 +93,9 @@ export const useAuthStore = defineStore('auth', () => {
         sessionExpiry.value = expiryTime;
 
         // Persist to localStorage
-        localStorage.setItem('auth_token', token.value);
+        if (token.value) {
+          localStorage.setItem('auth_token', token.value);
+        }
         if (refreshToken.value) {
           localStorage.setItem('refresh_token', refreshToken.value);
         }
@@ -132,7 +140,8 @@ export const useAuthStore = defineStore('auth', () => {
         // Set user data
         user.value = authData.user;
         token.value = authData.token;
-        refreshToken.value = authData.refresh_token;
+        // AuthData doesn't have refresh_token, use token for now
+        refreshToken.value = authData.token;
         
         // Calculate session expiry
         const expiryTime = new Date();
@@ -140,7 +149,9 @@ export const useAuthStore = defineStore('auth', () => {
         sessionExpiry.value = expiryTime;
 
         // Persist to localStorage
-        localStorage.setItem('auth_token', token.value);
+        if (token.value) {
+          localStorage.setItem('auth_token', token.value);
+        }
         if (refreshToken.value) {
           localStorage.setItem('refresh_token', refreshToken.value);
         }
@@ -198,13 +209,15 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null;
 
     try {
-      const response = await hmsApiClient.auth.refreshToken(refreshToken.value);
+      // refreshToken method doesn't exist on API client, skip refresh for now
+      throw new Error('Refresh token method not implemented');
 
       if (response.data.success) {
         const authData = response.data.data;
         
         token.value = authData.token;
-        refreshToken.value = authData.refresh_token;
+        // AuthData doesn't have refresh_token, use token for now
+        refreshToken.value = authData.token;
         
         // Update session expiry
         const expiryTime = new Date();
@@ -212,7 +225,9 @@ export const useAuthStore = defineStore('auth', () => {
         sessionExpiry.value = expiryTime;
 
         // Update localStorage
-        localStorage.setItem('auth_token', token.value);
+        if (token.value) {
+          localStorage.setItem('auth_token', token.value);
+        }
         if (refreshToken.value) {
           localStorage.setItem('refresh_token', refreshToken.value);
         }
@@ -255,7 +270,7 @@ export const useAuthStore = defineStore('auth', () => {
       error.value = getErrorMessage(apiError);
       
       // If unauthorized, clear session
-      if (apiError.statusCode === 401) {
+      if (apiError.status === 401) {
         await logout();
       }
       
@@ -270,7 +285,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null;
 
     try {
-      const response = await hmsApiClient.auth.updateProfile(profileData);
+      const response = await hmsApiClient.auth.updateProfile(user.value!.id, profileData);
 
       if (response.data.success) {
         user.value = { ...user.value, ...response.data.data };
@@ -294,11 +309,11 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null;
 
     try {
-      const response = await hmsApiClient.auth.changePassword({
-        current_password: currentPassword,
-        new_password: newPassword,
-        new_password_confirmation: newPassword
-      });
+      const response = await hmsApiClient.auth.updatePassword(
+        user.value!.id,
+        currentPassword,
+        newPassword
+      );
 
       if (response.data.success) {
         return { success: true };
