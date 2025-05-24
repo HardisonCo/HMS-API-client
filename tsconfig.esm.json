@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ES2020",
+    "outDir": "./dist/esm",
+    "declaration": false,
+    "declarationMap": false,
+    "moduleResolution": "node"
+  },
+  "exclude": [
+    "node_modules", 
+    "**/*.test.ts", 
+    "**/*.spec.ts",
+    "dist",
+    "src/api/hooks.ts",
+    "src/api-client-usage.ts",
+    "src/examples/composables.ts",
+    "src/examples/domains/**",
+    "src/examples/wizard-example.vue"
+  ]
+}

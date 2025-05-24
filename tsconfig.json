@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "./dist",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "lib": ["ES2020", "DOM"],
+    "rootDir": "src",
+    "preserveWatchOutput": true,
+    "removeComments": false
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules", 
+    "**/*.test.ts", 
+    "**/*.spec.ts",
+    "dist",
+    "src/api/hooks.ts",
+    "src/api-client-usage.ts",
+    "src/examples/composables.ts",
+    "src/examples/domains/**",
+    "src/examples/wizard-example.vue"
+  ]
+}
