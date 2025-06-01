@@ -3019,6 +3019,110 @@ export class PaymentApiClient extends BaseApiClient {
   }
 }
 
+// =================== DOMAIN TYPES =====================
+
+/**
+ * Domain configuration data
+ */
+export interface DomainData {
+  id: string;
+  name: string;
+  hostname: string;
+  alternateHostnames?: string[];
+  tenant?: {
+    id: string;
+    name: string;
+    environment: string;
+  };
+  environment: 'gov' | 'mkt' | 'mfe';
+  config: {
+    routing: {
+      defaultRoute: string;
+      authRequired: boolean;
+      redirects?: Record<string, string>;
+    };
+    api: {
+      baseURL: string;
+      version: string;
+    };
+    features: string[];
+    customization?: Record<string, any>;
+  };
+  status: 'active' | 'inactive' | 'maintenance';
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Domain API Client
+ */
+export class DomainApiClient extends BaseApiClient {
+  /**
+   * Get domain configuration by hostname
+   * @param hostname - Domain hostname
+   */
+  async getByHostname(hostname: string): Promise<AxiosResponse<ApiResponse<DomainData>>> {
+    return this.client.get(`/domains/hostname/${hostname}`);
+  }
+  
+  /**
+   * Get all domains
+   */
+  async getAllDomains(): Promise<AxiosResponse<ApiResponse<DomainData[]>>> {
+    return this.client.get('/domains');
+  }
+  
+  /**
+   * Get domain by ID
+   * @param domainId - Domain ID
+   */
+  async getDomain(domainId: string): Promise<AxiosResponse<ApiResponse<DomainData>>> {
+    return this.client.get(`/domains/${domainId}`);
+  }
+  
+  /**
+   * Create domain
+   * @param data - Domain creation data
+   */
+  async createDomain(data: Omit<DomainData, 'id' | 'createdAt' | 'updatedAt'>): Promise<AxiosResponse<ApiResponse<DomainData>>> {
+    return this.client.post('/domains', data);
+  }
+  
+  /**
+   * Update domain
+   * @param domainId - Domain ID
+   * @param data - Domain update data
+   */
+  async updateDomain(domainId: string, data: Partial<DomainData>): Promise<AxiosResponse<ApiResponse<DomainData>>> {
+    return this.client.put(`/domains/${domainId}`, data);
+  }
+  
+  /**
+   * Delete domain
+   * @param domainId - Domain ID
+   */
+  async deleteDomain(domainId: string): Promise<AxiosResponse<ApiResponse<null>>> {
+    return this.client.delete(`/domains/${domainId}`);
+  }
+  
+  /**
+   * Get domain configuration
+   * @param hostname - Domain hostname
+   */
+  async getConfiguration(hostname: string): Promise<AxiosResponse<ApiResponse<DomainData['config']>>> {
+    return this.client.get(`/domains/hostname/${hostname}/config`);
+  }
+  
+  /**
+   * Update domain status
+   * @param domainId - Domain ID
+   * @param status - New status
+   */
+  async updateStatus(domainId: string, status: DomainData['status']): Promise<AxiosResponse<ApiResponse<DomainData>>> {
+    return this.client.patch(`/domains/${domainId}/status`, { status });
+  }
+}
+
 // =================== COMBINED API CLIENT =====================
 
 /**
@@ -3036,6 +3140,7 @@ export function createHmsApiClient(config: ApiClientConfig) {
     items: new ItemsApiClient(config),
     programs: new ProgramsApiClient(config),
     protocols: new ProtocolApiClient(config),
+    domains: new DomainApiClient(config),
     
     // Module-Specific Clients (New implementations)
     order: new OrderApiClient(config),

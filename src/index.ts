@@ -9,7 +9,7 @@
 
 // Core API clients
 export { BaseApiClient, AuthApiClient, ItemsApiClient } from './api-client';
-export { createHmsApiClient, hmsApiClient } from './api/hms-api-client';
+export { createHmsApiClient, hmsApiClient, DomainApiClient } from './api/hms-api-client';
 export { WizardApiClient } from './api/wizard-api-client';
 
 // API utilities and error handling
