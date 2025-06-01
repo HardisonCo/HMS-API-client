@@ -1,11 +1,9 @@
 /**
  * HMS-API TypeScript Client
  * 
- * This is a TypeScript client for the HMS API generated from OpenAPI specifications.
+ * This is a TypeScript client for the HMS API using native fetch.
  * It provides type-safe access to API endpoints and request/response handling.
  */
-
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
 // Base API response structure
 export interface ApiResponse<T = any> {
@@ -37,48 +35,126 @@ export interface ApiError {
 }
 
 /**
- * Base API Client class that handles common functionality
+ * Base API Client class that handles common functionality using fetch
  */
 export class BaseApiClient {
-  protected readonly client: AxiosInstance;
+  protected readonly baseURL: string;
+  protected readonly timeout: number;
+  protected readonly withCredentials: boolean;
+  protected readonly defaultHeaders: Record<string, string>;
   
   constructor(config: ApiClientConfig) {
-    this.client = axios.create({
-      baseURL: config.baseURL,
-      timeout: config.timeout || 30000,
-      withCredentials: config.withCredentials || false,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...config.headers
-      }
-    });
+    this.baseURL = config.baseURL;
+    this.timeout = config.timeout || 30000;
+    this.withCredentials = config.withCredentials || false;
+    this.defaultHeaders = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...config.headers
+    };
+  }
+
+  /**
+   * Make an HTTP request using fetch
+   */
+  protected async request<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<ApiResponse<T>> {
+    const url = `${this.baseURL}${endpoint}`;
     
-    // Add request interceptor for authentication
-    this.client.interceptors.request.use(
-      (config) => {
-        const token = localStorage.getItem('auth_token');
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-      },
-      (error) => Promise.reject(error)
-    );
+    // Get auth token
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     
-    // Add response interceptor for error handling
-    this.client.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        // Handle common error scenarios
-        if (error.response?.status === 401) {
-          // Handle unauthorized access
+    // Prepare headers
+    const headers: Record<string, string> = {
+      ...this.defaultHeaders,
+      ...((options.headers as Record<string, string>) || {})
+    };
+    
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        credentials: this.withCredentials ? 'include' : 'omit',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      // Handle unauthorized access
+      if (response.status === 401) {
+        if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('auth:unauthorized'));
         }
-        
-        return Promise.reject(error);
       }
-    );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  }
+
+  /**
+   * GET request
+   */
+  protected async get<T>(endpoint: string, params?: Record<string, any>): Promise<ApiResponse<T>> {
+    let url = endpoint;
+    if (params) {
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.append(key, String(value));
+        }
+      });
+      const paramString = searchParams.toString();
+      if (paramString) {
+        url += `?${paramString}`;
+      }
+    }
+    
+    return this.request<T>(url, { method: 'GET' });
+  }
+
+  /**
+   * POST request
+   */
+  protected async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined
+    });
+  }
+
+  /**
+   * PUT request
+   */
+  protected async put<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined
+    });
+  }
+
+  /**
+   * DELETE request
+   */
+  protected async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { method: 'DELETE' });
   }
 }
 
@@ -191,24 +267,24 @@ export class ItemsApiClient extends BaseApiClient {
    * Get a list of all items
    * @param params - Query parameters for filtering
    */
-  async getItems(params?: { status?: ItemStatus; page?: number; perPage?: number }): Promise<AxiosResponse<ApiResponse<ItemCollectionData>>> {
-    return this.client.get('/items', { params });
+  async getItems(params?: { status?: ItemStatus; page?: number; perPage?: number }): Promise<ApiResponse<ItemCollectionData>> {
+    return this.get<ItemCollectionData>('/items', params);
   }
   
   /**
    * Get a specific item by ID
    * @param id - Item ID
    */
-  async getItem(id: number): Promise<AxiosResponse<ApiResponse<ItemData>>> {
-    return this.client.get(`/items/${id}`);
+  async getItem(id: number): Promise<ApiResponse<ItemData>> {
+    return this.get<ItemData>(`/items/${id}`);
   }
   
   /**
    * Create a new item
    * @param data - Item data
    */
-  async createItem(data: Omit<ItemData, 'id' | 'createdAt' | 'updatedAt'>): Promise<AxiosResponse<ApiResponse<ItemData>>> {
-    return this.client.post('/items', data);
+  async createItem(data: Omit<ItemData, 'id' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<ItemData>> {
+    return this.post<ItemData>('/items', data);
   }
   
   /**
@@ -216,16 +292,16 @@ export class ItemsApiClient extends BaseApiClient {
    * @param id - Item ID
    * @param data - Updated item data
    */
-  async updateItem(id: number, data: Partial<Omit<ItemData, 'id' | 'createdAt' | 'updatedAt'>>): Promise<AxiosResponse<ApiResponse<ItemData>>> {
-    return this.client.put(`/items/${id}`, data);
+  async updateItem(id: number, data: Partial<Omit<ItemData, 'id' | 'createdAt' | 'updatedAt'>>): Promise<ApiResponse<ItemData>> {
+    return this.put<ItemData>(`/items/${id}`, data);
   }
   
   /**
    * Delete an item
    * @param id - Item ID
    */
-  async deleteItem(id: number): Promise<AxiosResponse<ApiResponse<null>>> {
-    return this.client.delete(`/items/${id}`);
+  async deleteItem(id: number): Promise<ApiResponse<null>> {
+    return this.delete<null>(`/items/${id}`);
   }
 }
 
@@ -237,12 +313,14 @@ export class AuthApiClient extends BaseApiClient {
    * Login with email and password
    * @param data - Login credentials
    */
-  async login(data: LoginData): Promise<AxiosResponse<ApiResponse<AuthData>>> {
-    const response = await this.client.post('/auth/login', data);
+  async login(data: LoginData): Promise<ApiResponse<AuthData>> {
+    const response = await this.post<AuthData>('/auth/login', data);
     
-    if (response.data.success && response.data.data.token) {
+    if (response.success && response.data.token) {
       // Store the token
-      localStorage.setItem('auth_token', response.data.data.token);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_token', response.data.token);
+      }
     }
     
     return response;
@@ -251,14 +329,18 @@ export class AuthApiClient extends BaseApiClient {
   /**
    * Logout the current user
    */
-  async logout(): Promise<AxiosResponse<ApiResponse<null>>> {
+  async logout(): Promise<ApiResponse<null>> {
     try {
-      const response = await this.client.post('/auth/logout');
-      localStorage.removeItem('auth_token');
+      const response = await this.post<null>('/auth/logout');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+      }
       return response;
     } catch (error) {
       // Always remove the token even if the API call fails
-      localStorage.removeItem('auth_token');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+      }
       throw error;
     }
   }
@@ -266,15 +348,15 @@ export class AuthApiClient extends BaseApiClient {
   /**
    * Get the currently authenticated user
    */
-  async getCurrentUser(): Promise<AxiosResponse<ApiResponse<UserData>>> {
-    return this.client.get('/auth/user');
+  async getCurrentUser(): Promise<ApiResponse<UserData>> {
+    return this.get<UserData>('/auth/user');
   }
   
   /**
    * Check if the user is authenticated
    */
   isAuthenticated(): boolean {
-    return !!localStorage.getItem('auth_token');
+    return typeof window !== 'undefined' ? !!localStorage.getItem('auth_token') : false;
   }
 }
 
@@ -291,4 +373,4 @@ export function createApiClient(config: ApiClientConfig) {
 
 // Example usage
 // const api = createApiClient({ baseURL: 'http://api.example.com' });
-// api.items.getItems().then(response => console.log(response.data));
+// api.items.getItems().then(response => console.log(response));

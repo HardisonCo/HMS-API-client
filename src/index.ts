@@ -45,4 +45,4 @@ export type {
 } from './api/hms-api-client';
 
 // Re-export commonly used types
-export type { AxiosResponse, AxiosError } from 'axios';
+// Note: We use native fetch instead of axios for better compatibility

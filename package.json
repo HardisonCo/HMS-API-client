@@ -1,6 +1,6 @@
 {
   "name": "wizard-api-client",
-  "version": "1.1.0",
+  "version": "1.1.5",
   "description": "TypeScript client library for HMS API with Five-Step Wizard integration",
   "main": "dist/index.js",
   "module": "dist/esm/index.js",
@@ -58,7 +58,6 @@
   "author": "HMS Team",
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.6.0",
     "zod": "^3.23.0",
     "vue": "^3.4.0",
     "pinia": "^2.1.7",
@@ -89,7 +88,6 @@
     "vue-tsc": "^1.8.0"
   },
   "peerDependencies": {
-    "axios": "^1.6.0",
     "vue": "^3.4.0",
     "pinia": "^2.1.0",
     "vue-router": "^4.2.0"
