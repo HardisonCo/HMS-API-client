@@ -67,7 +67,6 @@
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "^2.7.0",
-    "@redocly/openapi-cli": "^1.5.0",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.10.0",
     "@vitejs/plugin-vue": "^4.5.0",
